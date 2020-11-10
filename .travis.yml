@@ -55,6 +55,14 @@ jobs:
       script:
         - pytest -W error
 
+    - name: Windows
+      os: windows
+      language: shell
+      compiler: gcc
+      before_install:
+        - choco install python --version=3.8.5
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+
     - name: Documentation build
       install:
         - pip install -e .[docs]
