@@ -1,3 +1,4 @@
+import collections
 import copy
 import logging
 import os
@@ -15,11 +16,8 @@ __doctest_skip__ = ['ModelContainer']
 
 __all__ = ['ModelContainer']
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.NullHandler())
 
-class ModelContainer(DataModel):
+class ModelContainer(DataModel, collections.abc.MutableSequence):
     """
     A container for holding DataModels.
 
@@ -203,8 +201,6 @@ class ModelContainer(DataModel):
         # grab all the files
         if self.asn_exptypes:
             infiles = []
-            logger.debug('Filtering datasets based on allowed exptypes {}:'
-                         .format(self.asn_exptypes))
             for member in asn_data['products'][0]['members']:
                 if any([x for x in self.asn_exptypes if re.match(member['exptype'],
                                                                  x, re.IGNORECASE)]):
