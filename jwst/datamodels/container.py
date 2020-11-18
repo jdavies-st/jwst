@@ -1,8 +1,7 @@
 import copy
-from collections import OrderedDict
-import os.path as op
-import re
 import logging
+import os
+import re
 
 from asdf import AsdfFile
 from astropy.io import fits
@@ -20,7 +19,7 @@ __all__ = ['ModelContainer']
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-class ModelContainer(JwstDataModel):
+class ModelContainer(DataModel):
     """
     A container for holding DataModels.
 
@@ -69,20 +68,20 @@ class ModelContainer(JwstDataModel):
     >>> m = datamodels.open('myfile.fits')
     >>> c.append(m)
     """
-
     # This schema merely extends the 'meta' part of the datamodel, and
     # does not describe the data contents of the container.
     schema_url = "http://stsci.edu/schemas/jwst_datamodel/container.schema"
 
     def __init__(self, init=None, asn_exptypes=None, asn_n_members=None, iscopy=False, **kwargs):
 
-        super().__init__(init=None, asn_exptypes=None, **kwargs)
+        super().__init__(init=None, **kwargs)
 
         self._models = []
         self._iscopy = iscopy
         self.asn_exptypes = asn_exptypes
         self.asn_n_members = asn_n_members
         self._memmap = kwargs.get("memmap", False)
+        self.meta.asn_table = {}
 
         if init is None:
             # Don't populate the container with models
@@ -179,7 +178,7 @@ class ModelContainer(JwstDataModel):
         # Prevent circular import:
         from ..associations import AssociationNotValidError, load_asn
 
-        filepath = op.abspath(op.expanduser(op.expandvars(filepath)))
+        filepath = os.path.abspath(os.path.expanduser(os.path.expandvars(filepath)))
         try:
             with open(filepath) as asn_file:
                 asn_data = load_asn(asn_file)
@@ -216,8 +215,8 @@ class ModelContainer(JwstDataModel):
                        in asn_data['products'][0]['members']]
 
         if asn_file_path:
-            asn_dir = op.dirname(asn_file_path)
-            infiles = [op.join(asn_dir, f) for f in infiles]
+            asn_dir = os.path.dirname(asn_file_path)
+            infiles = [os.path.join(asn_dir, f) for f in infiles]
 
         # Only handle the specified number of members.
         if self.asn_n_members:
@@ -241,10 +240,10 @@ class ModelContainer(JwstDataModel):
         if asn_file_path is None:
             self.meta.table_name = 'not specified'
         else:
-            self.meta.table_name = op.basename(asn_file_path)
+            self.meta.table_name = os.path.basename(asn_file_path)
             for model in self:
                 try:
-                    model.meta.asn.table_name = op.basename(asn_file_path)
+                    model.meta.asn.table_name = os.path.basename(asn_file_path)
                     model.meta.asn.pool_name = asn_data['asn_pool']
                 except AttributeError:
                     pass
@@ -293,12 +292,12 @@ class ModelContainer(JwstDataModel):
             if len(self) <= 1:
                 idx = None
             if save_model_func is None:
-                outpath, filename = op.split(
+                outpath, filename = os.path.split(
                     path(model.meta.filename, idx=idx)
                 )
                 if dir_path:
                     outpath = dir_path
-                save_path = op.join(outpath, filename)
+                save_path = os.path.join(outpath, filename)
                 try:
                     output_paths.append(
                         model.save(save_path, *args, **kwargs)
@@ -354,14 +353,14 @@ class ModelContainer(JwstDataModel):
         Returns a list of a list of datamodels grouped by exposure.
         """
         self._assign_group_ids()
-        group_dict = OrderedDict()
+        groups = {}
         for model in self._models:
             group_id = model.meta.group_id
-            if group_id in group_dict:
-                group_dict[group_id].append(model)
+            if group_id in groups:
+                groups[group_id].append(model)
             else:
-                group_dict[group_id] = [model]
-        return group_dict.values()
+                groups[group_id] = [model]
+        return groups.values()
 
     @property
     def group_names(self):
@@ -441,8 +440,8 @@ def make_file_with_index(file_path, idx):
         Path with index appended
     """
     # Decompose path
-    path_head, path_tail = op.split(file_path)
-    base, ext = op.splitext(path_tail)
+    path_head, path_tail = os.path.split(file_path)
+    base, ext = os.path.splitext(path_tail)
     if idx is not None:
         base = base + str(idx)
-    return op.join(path_head, base + ext)
+    return os.path.join(path_head, base + ext)
