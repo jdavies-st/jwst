@@ -13,6 +13,17 @@ FITS_FILE = os.path.join(ROOT_DIR, 'test.fits')
 ASN_FILE = os.path.join(ROOT_DIR, 'association.json')
 
 
+def test_modelcontainer_is_mutablesequence():
+    container = ModelContainer()
+    container.append(JwstDataModel())
+    container.append(JwstDataModel())
+    container.append(JwstDataModel())
+    for model in container:
+        assert isinstance(model, JwstDataModel)
+    assert len(container) == 3
+    container.pop()
+    assert len(container) == 2
+
 
 @pytest.fixture
 def container():

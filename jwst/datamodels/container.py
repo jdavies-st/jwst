@@ -1,6 +1,5 @@
 import collections
 import copy
-import logging
 import os
 import re
 
@@ -17,7 +16,271 @@ __doctest_skip__ = ['ModelContainer']
 __all__ = ['ModelContainer']
 
 
-class ModelContainer(DataModel, collections.abc.MutableSequence):
+class _ModelContainer(collections.abc.MutableSequence):
+    def __init__(self, *args, iscopy=False, **kwargs):
+        self._models = []
+        self._iscopy = iscopy
+
+    def __len__(self):
+        return len(self._models)
+
+    def __getitem__(self, index):
+        return self._models[index]
+
+    def __setitem__(self, index, model):
+        self._models[index] = model
+
+    def __delitem__(self, index):
+        del self._models[index]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def close(self):
+        """Close all datamodels."""
+        if not self._iscopy:
+            for model in self._models:
+                model.close()
+
+    def copy(self, memo=None):
+        """
+        Returns a deep copy of the models in this model container.
+        """
+        result = self.__class__()
+        result._iscopy = self._iscopy
+        for m in self:
+            result.append(m.copy())
+        return result
+
+    def insert(self, index, model):
+        self._models.insert(index, model)
+
+
+class ModelContainer(_ModelContainer):
+
+    def __init__(self, init=None, asn_exptypes=None, asn_n_members=None,
+                 iscopy=False, **kwargs):
+        super().__init__(init=None, **kwargs)
+
+        self._models = []
+        self._iscopy = iscopy
+        self.asn_exptypes = asn_exptypes
+        self.asn_n_members = asn_n_members
+        self._memmap = kwargs.get("memmap", False)
+
+        if is_association(init):
+            self.from_asn(init)
+        elif isinstance(init, str):
+            init_from_asn = self.read_asn(init)
+            self.from_asn(init_from_asn, asn_file_path=init)
+
+    def read_asn(self, filepath):
+        """
+        Load fits files from a JWST association file.
+
+        Parameters
+        ----------
+        filepath : str
+            The path to an association file.
+        """
+        from ..associations import load_asn, AssociationNotValidError
+
+        filepath = os.path.abspath(os.path.expanduser(os.path.expandvars(filepath)))
+        try:
+            with open(filepath) as asn_file:
+                asn_data = load_asn(asn_file)
+        except AssociationNotValidError:
+            raise IOError("Cannot read ASN file.")
+        return asn_data
+
+    def from_asn(self, asn_data, asn_file_path=None):
+        """
+        Load fits files from a JWST association file.
+
+        Parameters
+        ----------
+        asn_data : Association
+            An association dictionary
+
+        asn_file_path: str
+            Filepath of the association, if known.
+        """
+        # match the asn_exptypes to the exptype in the association and retain
+        # only those file that match, as a list, if asn_exptypes is set to none
+        # grab all the files
+        if self.asn_exptypes:
+            infiles = []
+            for member in asn_data['products'][0]['members']:
+                if any([x for x in self.asn_exptypes if re.match(member['exptype'],
+                                                                 x, re.IGNORECASE)]):
+                    infiles.append(member['expname'])
+        else:
+            infiles = [member['expname'] for member
+                       in asn_data['products'][0]['members']]
+
+        if asn_file_path:
+            asn_dir = os.path.dirname(asn_file_path)
+            infiles = [os.path.join(asn_dir, f) for f in infiles]
+
+        # Only handle the specified number of members.
+        if self.asn_n_members:
+            sublist = infiles[:self.asn_n_members]
+        else:
+            sublist = infiles
+        try:
+            for filepath in sublist:
+                self._models.append(datamodel_open(filepath, memmap=self._memmap))
+        except IOError:
+            self.close()
+            raise
+
+        # Pull the whole association table into meta.asn_table
+        self.meta.asn_table = {}
+        properties.merge_tree(
+            self.meta.asn_table._instance, asn_data
+        )
+
+        self.meta.resample.output = asn_data['products'][0]['name']
+        if asn_file_path is None:
+            self.meta.table_name = 'not specified'
+        else:
+            self.meta.table_name = os.path.basename(asn_file_path)
+            for model in self:
+                try:
+                    model.meta.asn.table_name = os.path.basename(asn_file_path)
+                    model.meta.asn.pool_name = asn_data['asn_pool']
+                except AttributeError:
+                    pass
+        self.meta.pool_name = asn_data['asn_pool']
+
+    def save(self,
+             path=None,
+             dir_path=None,
+             save_model_func=None,
+             *args, **kwargs):
+        """
+        Write out models in container to FITS or ASDF.
+
+        Parameters
+        ----------
+        path : str or func or None
+            - If None, the `meta.filename` is used for each model.
+            - If a string, the string is used as a root and an index is
+              appended.
+            - If a function, the function takes the two arguments:
+              the value of model.meta.filename and the
+              `idx` index, returning constructed file name.
+
+        dir_path : str
+            Directory to write out files.  Defaults to current working dir.
+            If directory does not exist, it creates it.  Filenames are pulled
+            from `.meta.filename` of each datamodel in the container.
+
+        save_model_func: func or None
+            Alternate function to save each model instead of
+            the models `save` method. Takes one argument, the model,
+            and keyword argument `idx` for an index.
+
+        Returns
+        -------
+        output_paths: [str[, ...]]
+            List of output file paths of where the models were saved.
+        """
+        output_paths = []
+        if path is None:
+            path = lambda filename, idx: filename
+        elif not callable(path):
+            path = make_file_with_index
+
+        for idx, model in enumerate(self):
+            if len(self) <= 1:
+                idx = None
+            if save_model_func is None:
+                outpath, filename = os.path.split(
+                    path(model.meta.filename, idx=idx)
+                )
+                if dir_path:
+                    outpath = dir_path
+                save_path = os.path.join(outpath, filename)
+                try:
+                    output_paths.append(
+                        model.save(save_path, *args, **kwargs)
+                    )
+                except IOError as err:
+                    raise err
+
+            else:
+                output_paths.append(save_model_func(model, idx=idx))
+
+        return output_paths
+
+    def _assign_group_ids(self):
+        """
+        Assign an ID grouping by exposure.
+
+        Data from different detectors of the same exposure will have the
+        same group id, which allows grouping by exposure.  The following
+        metadata is used for grouping:
+
+        meta.observation.program_number
+        meta.observation.observation_number
+        meta.observation.visit_number
+        meta.observation.visit_group
+        meta.observation.sequence_id
+        meta.observation.activity_id
+        meta.observation.exposure_number
+        """
+        unique_exposure_parameters = [
+            'program_number',
+            'observation_number',
+            'visit_number',
+            'visit_group',
+            'sequence_id',
+            'activity_id',
+            'exposure_number'
+            ]
+
+        for i, model in enumerate(self._models):
+            params = []
+            for param in unique_exposure_parameters:
+                params.append(getattr(model.meta.observation, param))
+            try:
+                group_id = ('jw' + '_'.join([''.join(params[:3]),
+                                             ''.join(params[3:6]), params[6]]))
+                model.meta.group_id = group_id
+            except TypeError:
+                model.meta.group_id = 'exposure{0:04d}'.format(i + 1)
+
+    @property
+    def models_grouped(self):
+        """
+        Returns a list of a list of datamodels grouped by exposure.
+        """
+        self._assign_group_ids()
+        groups = {}
+        for model in self._models:
+            group_id = model.meta.group_id
+            if group_id in groups:
+                groups[group_id].append(model)
+            else:
+                groups[group_id] = [model]
+        return groups.values()
+
+    @property
+    def group_names(self):
+        """
+        Return list of names for the DataModel groups by exposure.
+        """
+        result = []
+        for group in self.models_grouped:
+            result.append(group[0].meta.group_id)
+        return result
+
+
+class OldModelContainer(JwstDataModel, collections.abc.MutableSequence):
     """
     A container for holding DataModels.
 
@@ -72,7 +335,7 @@ class ModelContainer(DataModel, collections.abc.MutableSequence):
 
     def __init__(self, init=None, asn_exptypes=None, asn_n_members=None, iscopy=False, **kwargs):
 
-        super().__init__(init=None, **kwargs)
+        super().__init__(init=None, asn_exptypes=None, **kwargs)
 
         self._models = []
         self._iscopy = iscopy
@@ -205,7 +468,6 @@ class ModelContainer(DataModel, collections.abc.MutableSequence):
                 if any([x for x in self.asn_exptypes if re.match(member['exptype'],
                                                                  x, re.IGNORECASE)]):
                     infiles.append(member['expname'])
-                    logger.debug('Files accepted for processing {}:'.format(member['expname']))
         else:
             infiles = [member['expname'] for member
                        in asn_data['products'][0]['members']]
