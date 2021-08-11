@@ -300,9 +300,44 @@ def diff_astropy_tables():
 
     return _diff_astropy_tables
 
+
+@pytest.fixture
+def assert_most_pixels_same():
+    """Pytest assertion helper to assert most pixels are the same, i.e. 99%
+
+    This assertion help mutates the diff for those with diff_data or of the
+    specified hdu_name
+
+    This assertion helper is good for comparisons where we want to make sure
+    that most pixels are the same, but cannot guarantee that because floating
+    point differences and the effects of thresholding.
+    """
+    def _assert_most_pixels_same(diff, allowed_diff_ratio=1e-5, hdu_name=None):
+        # __tracebackhide__ = True
+        if hdu_name is not None and hdu_name not in [d[2] for d in diff.diff_hdus]:
+            # If the named hdu is not in here, do the standard diff
+            assert diff.identical, diff.report()
+        # Loop through hdu diffs and "OKify" the specified ones if they meet
+        # the criteria
+        for d in diff.diff_hdus:
+            # diff_hdus is a tuple (ext, diff_object, name, ver)
+            if hdu_name is None or d[2] == hdu_name:
+                hdudiff = d[1]
+            else:
+                break
+            try:
+                # Make sure most pixels are the same for HDUs that have a
+                # data array
+                if hdudiff.diff_data.diff_ratio < allowed_diff_ratio:
+                    hdudiff.identical = True
+            except AttributeError:
+                pass
+        assert diff.identical, diff.report()
+
+    return _assert_most_pixels_same
+
+
 # Add option to specify a single pool name
-
-
 def pytest_addoption(parser):
     parser.addoption(
         '--sdp-pool', metavar='sdp_pool', default=None,
