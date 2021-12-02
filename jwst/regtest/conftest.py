@@ -81,6 +81,7 @@ def generate_artifactory_json(request, artifactory_repos):
         build_matrix_suffix = os.environ.get('BUILD_MATRIX_SUFFIX', '0')
         subdir = '{}_{}_{}'.format(TODAYS_DATE, build_tag, build_matrix_suffix)
         testname = request.node.originalname or request.node.name
+        testname = os.path.basename(request.node.funcargs["jail"]) or os.path.basename(request.node.funcargs["_jail"])
 
         return os.path.join(results_root, subdir, testname) + os.sep
 
