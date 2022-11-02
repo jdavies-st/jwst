@@ -32,25 +32,25 @@ jobs:
             os: ubuntu-latest
             toxenv: py310
 
-          - name: Latest dependency versions w/coverage
-            os: ubuntu-latest
-            python-version: 3.9
-            toxenv: py39-cov
+          # - name: Latest dependency versions w/coverage
+          #   os: ubuntu-latest
+          #   python-version: 3.9
+          #   toxenv: py39-cov
 
-          - name: Oldest dependency versions
-            os: ubuntu-latest
-            python-version: 3.8
-            toxenv: py38-oldestdeps-cov
+          # - name: Oldest dependency versions
+          #   os: ubuntu-latest
+          #   python-version: 3.8
+          #   toxenv: py38-oldestdeps-cov
 
-          - name: SDP dependencies in requirements-sdp.txt
-            os: ubuntu-latest
-            python-version: 3.9
-            toxenv: sdpdeps
+          # - name: SDP dependencies in requirements-sdp.txt
+          #   os: ubuntu-latest
+          #   python-version: 3.9
+          #   toxenv: sdpdeps
 
-          - name: Installed package with --pyargs
-            os: ubuntu-latest
-            python-version: 3.9
-            toxenv: pyargs
+          # - name: Installed package with --pyargs
+          #   os: ubuntu-latest
+          #   python-version: 3.9
+          #   toxenv: pyargs
 
           # - name: Verify install_requires in setup.py
           #   os: ubuntu-latest
@@ -85,15 +85,17 @@ jobs:
           fetch-depth: 0
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
-        id: setup
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
           cache-dependency-path: setup.cfg
-      - run: echo '${{ steps.setup.outputs.cache-hit }}'
       - name: Install tox
         run: |
           pip install tox
+      - uses: actions/cache@v3
+        with:
+          path: ${{ env.CRDS_PATH }}
+          key: crds-reffile-path-${{ hashFiles(format('{0}{1}', env.CRDS_PATH, '/references/**/*.*')) }}
       - name: Run tests
         run: tox -e ${{ matrix.toxenv }}
       - name: Upload coverage to codecov
