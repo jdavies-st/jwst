@@ -94,19 +94,20 @@ jobs:
           pip install tox
       - name: Get CRDS context
         id: crds-context
+        # Get default CRDS_CONTEXT without having to install crds client
         # See https://hst-crds.stsci.edu/static/users_guide/web_services.html#generic-request
         run: >
           echo "pmap=$(
           curl -s -X POST -d '{"jsonrpc": "1.0", "method": "get_default_context", "params": ["jwst"], "id": 1}' https://jwst-crds.stsci.edu/json/ |
           python -c "import sys, json; print(json.load(sys.stdin)['result'])"
           )" >> $GITHUB_OUTPUT
-      - run: echo "${{ steps.crds-context.outputs.pmap }}"
-      - name: Run tests
-        run: tox -e ${{ matrix.toxenv }}
+      - run: echo "CRDS CONTEXT ${{ steps.crds-context.outputs.pmap }}"
       - uses: actions/cache@v3
         with:
           path: ${{ env.CRDS_PATH }}
           key: crds-reffiles-context-${{ steps.crds-context.outputs.pmap }}
+      - name: Run tests
+        run: tox -e ${{ matrix.toxenv }}
       - name: Upload coverage to codecov
         if: ${{ contains(matrix.toxenv,'-cov') }}
         uses: codecov/codecov-action@v3
