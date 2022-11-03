@@ -21,7 +21,7 @@ env:
 
 jobs:
   check:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.toxenv }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -50,19 +50,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Test latest dependency versions
+          - name: test latest dependency versions
             os: ubuntu-latest
             python-version: "3.x"
             toxenv: test-cov
-          - name: Test oldest dependency versions
+          - name: test oldest dependency versions
             os: ubuntu-latest
             python-version: 3.8
             toxenv: test-oldestdeps-cov
-          - name: Test SDP dependencies in requirements-sdp.txt
+          - name: test SDP dependencies in requirements-sdp.txt
             os: ubuntu-latest
             python-version: 3.9
             toxenv: test-sdpdeps
-          - name: Test installed package with --pyargs
+          - name: test installed package with --pyargs
             os: ubuntu-latest
             python-version: 3.9
             toxenv: test-pyargs
