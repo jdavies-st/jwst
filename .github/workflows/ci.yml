@@ -20,28 +20,28 @@ env:
   CRDS_CLIENT_RETRY_DELAY_SECONDS: 20
 
 jobs:
-  check:
-    name: ${{ matrix.toxenv }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        toxenv: [check-style, check-security, check-dependencies, check-build]
-        python-version: ['3.x']
-        os: [ ubuntu-latest ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Run ${{ matrix.toxenv }}
-        run: |
-          pip install tox
-          tox -e ${{ matrix.toxenv }}
+  # check:
+  #   name: ${{ matrix.toxenv }}
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       toxenv: [check-style, check-security, check-dependencies, check-build]
+  #       python-version: ['3.x']
+  #       os: [ ubuntu-latest ]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #       with:
+  #         fetch-depth: 0
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #     - name: Run ${{ matrix.toxenv }}
+  #       run: |
+  #         pip install tox
+  #         tox -e ${{ matrix.toxenv }}
 
   test:
     name: ${{ matrix.toxenv }}
@@ -54,18 +54,18 @@ jobs:
             os: ubuntu-latest
             python-version: "3.x"
             toxenv: test-xdist-cov
-          - name: test oldest dependency versions
-            os: ubuntu-latest
-            python-version: 3.8
-            toxenv: test-oldestdeps-xdist-cov
-          - name: test SDP dependencies in requirements-sdp.txt
-            os: ubuntu-latest
-            python-version: 3.9
-            toxenv: test-sdpdeps-xdist
-          - name: test installed package with --pyargs
-            os: ubuntu-latest
-            python-version: '3.10'
-            toxenv: test-pyargs-xdist
+          # - name: test oldest dependency versions
+          #   os: ubuntu-latest
+          #   python-version: 3.8
+          #   toxenv: test-oldestdeps-xdist-cov
+          # - name: test SDP dependencies in requirements-sdp.txt
+          #   os: ubuntu-latest
+          #   python-version: 3.9
+          #   toxenv: test-sdpdeps-xdist
+          # - name: test installed package with --pyargs
+          #   os: ubuntu-latest
+          #   python-version: '3.10'
+          #   toxenv: test-pyargs-xdist
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -87,15 +87,15 @@ jobs:
           python -c "import sys, json; print(json.load(sys.stdin)['result'])"
           )" >> $GITHUB_OUTPUT
       - run: echo "CRDS CONTEXT ${{ steps.crds-context.outputs.pmap }}"
-      - name: Run ${{ matrix.toxenv }}
-        run: |
-          pip install tox
-          tox -e ${{ matrix.toxenv }}
       - name: Cache CRDS reference files
         uses: actions/cache@v3
         with:
           path: ${{ env.CRDS_PATH }}
-          key: crds-reffiles-context-${{ steps.crds-context.outputs.pmap }}
+          key: crds-reffiles-${{ steps.crds-context.outputs.pmap }}
+      - name: Run ${{ matrix.toxenv }}
+        run: |
+          pip install tox
+          tox -e ${{ matrix.toxenv }}
       - name: Upload coverage to codecov
         if: ${{ contains(matrix.toxenv,'-cov') }}
         uses: codecov/codecov-action@v3
