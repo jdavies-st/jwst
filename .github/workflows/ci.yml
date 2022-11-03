@@ -20,64 +20,52 @@ env:
   CRDS_CLIENT_RETRY_DELAY_SECONDS: 20
 
 jobs:
-  tox:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        toxenv: [check-style, check-security, check-dependencies, check-build]
+        python-version: ['3.x']
+        os: [ ubuntu-latest ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run ${{ matrix.toxenv }}
+        run: |
+          pip install tox
+          tox -e ${{ matrix.toxenv }}
+
+  test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Python 3.10 Tests
-            python-version: '3.10'
+          - name: Test latest dependency versions
             os: ubuntu-latest
-            toxenv: py310
-
-          # - name: Latest dependency versions w/coverage
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: py39-cov
-
-          # - name: Oldest dependency versions
-          #   os: ubuntu-latest
-          #   python-version: 3.8
-          #   toxenv: py38-oldestdeps-cov
-
-          # - name: SDP dependencies in requirements-sdp.txt
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: sdpdeps
-
-          # - name: Installed package with --pyargs
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: pyargs
-
-          # - name: Verify install_requires in setup.py
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: verify-install-requires
-
-          # - name: Build distribution
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: twine
-
-          # - name: Code style check
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: style
-
-          # - name: Security audit
-          #   os: ubuntu-latest
-          #   python-version: 3.9
-          #   toxenv: security
-
-          # MacOS job is flaky on Github actions and fails routinely.
-          # Re-enable when things get more reliable.
-          # - name: macOS
-          #   os: macos-latest
-          #   python-version: 3.9
-          #   toxenv: py39
+            python-version: "3.x"
+            toxenv: test-cov
+          - name: Test oldest dependency versions
+            os: ubuntu-latest
+            python-version: 3.8
+            toxenv: test-oldestdeps-cov
+          - name: Test SDP dependencies in requirements-sdp.txt
+            os: ubuntu-latest
+            python-version: 3.9
+            toxenv: test-sdpdeps
+          - name: Test installed package with --pyargs
+            os: ubuntu-latest
+            python-version: 3.9
+            toxenv: test-pyargs
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -89,9 +77,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
           cache-dependency-path: setup.cfg
-      - name: Install tox
-        run: |
-          pip install tox
       - name: Get CRDS context
         id: crds-context
         # Get default CRDS_CONTEXT without having to install crds client
@@ -102,12 +87,15 @@ jobs:
           python -c "import sys, json; print(json.load(sys.stdin)['result'])"
           )" >> $GITHUB_OUTPUT
       - run: echo "CRDS CONTEXT ${{ steps.crds-context.outputs.pmap }}"
-      - uses: actions/cache@v3
+      - name: Cache CRDS reference files
+        uses: actions/cache@v3
         with:
           path: ${{ env.CRDS_PATH }}
           key: crds-reffiles-context-${{ steps.crds-context.outputs.pmap }}
-      - name: Run tests
-        run: tox -e ${{ matrix.toxenv }}
+      - name: Run ${{ matrix.toxenv }}
+        run: |
+          pip install tox
+          tox -e ${{ matrix.toxenv }}
       - name: Upload coverage to codecov
         if: ${{ contains(matrix.toxenv,'-cov') }}
         uses: codecov/codecov-action@v3
