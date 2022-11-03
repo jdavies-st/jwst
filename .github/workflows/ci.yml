@@ -93,19 +93,20 @@ jobs:
         run: |
           pip install tox
       - name: Get CRDS context
-        id: crds
-        run: |
-          echo "::set-output name=context::$(
-            curl -s -X POST -d '{"jsonrpc": "1.0", "method": "get_default_context", "params": ["jwst"], "id": 1}' https://jwst-crds.stsci.edu/json/ |
-            python -c "import sys, json; print(json.load(sys.stdin)['result'])"
-          )"
-      - run: echo "${{ steps.crds.outputs.context }}"
+        id: crds-context
+        # See https://hst-crds.stsci.edu/static/users_guide/web_services.html#generic-request
+        run: >
+          echo "pmap=$(
+          curl -s -X POST -d '{"jsonrpc": "1.0", "method": "get_default_context", "params": ["jwst"], "id": 1}' https://jwst-crds.stsci.edu/json/ |
+          python -c "import sys, json; print(json.load(sys.stdin)['result'])"
+          )" >> $GITHUB_OUTPUT
+      - run: echo "${{ steps.crds-context.outputs.pmap }}"
+      - name: Run tests
+        run: tox -e ${{ matrix.toxenv }}
       - uses: actions/cache@v3
         with:
           path: ${{ env.CRDS_PATH }}
-          key: crds-reffile-path-${{ hashFiles(format('{0}{1}', env.CRDS_PATH, '/references/**/*.*')) }}
-      - name: Run tests
-        run: tox -e ${{ matrix.toxenv }}
+          key: crds-reffiles-context-${{ steps.crds-context.outputs.pmap }}
       - name: Upload coverage to codecov
         if: ${{ contains(matrix.toxenv,'-cov') }}
         uses: codecov/codecov-action@v3
