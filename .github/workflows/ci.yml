@@ -79,7 +79,7 @@ jobs:
           cache-dependency-path: setup.cfg
       - name: Get CRDS context
         id: crds-context
-        # Get the default CRDS_CONTEXT without having to install crds client
+        # Get default CRDS_CONTEXT without installing crds client
         # See https://hst-crds.stsci.edu/static/users_guide/web_services.html#generic-request
         run: >
           echo "pmap=$(
