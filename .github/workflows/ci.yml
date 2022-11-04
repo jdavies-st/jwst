@@ -91,7 +91,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.CRDS_PATH }}
-          key: crds-reffiles-${{ steps.crds-context.outputs.pmap }}
+          # key: crds-reffiles-${{ steps.crds-context.outputs.pmap }}
+          key: crds-reffiles-jwst_0000.pmap
       - name: Run ${{ matrix.toxenv }}
         run: |
           pip install tox
