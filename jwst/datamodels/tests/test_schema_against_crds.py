@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from jwst import datamodels as dm
 import pytest
 import warnings
-from ..util import NoTypeWarning
+from jwst.datamodels.util import NoTypeWarning
 
 log = logging.getLogger(__name__)
 
