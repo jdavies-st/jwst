@@ -41,6 +41,9 @@ cube_build
 - Change fill value for regions of SCI and ERR extensions with no data
   from 0 to nan. [#7337]
 
+- Remove code trimming zero-valued planes from cubes, so that cubes of fixed length will always
+  be produced. Move nan-value setting to below spectral tear cleanup. [#7391]
+
 datamodels
 ----------
 
@@ -121,6 +124,10 @@ ramp_fitting
 
 - Change the propagation of the SATURATED flag to be done only for complete
   saturation. [#7363, spacetelescope/stcal#125]
+
+- Update CI tests for ramp fitting due to setting pixels to NaN with no usable
+  data to compute slopes in the the rate and rateints products.  Previously,
+  this data was set to zero. [#7389, spacetelescope/stcal#131]
 
 resample
 --------
