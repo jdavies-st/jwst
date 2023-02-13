@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-def do_correction(input_model, rscd_model, type):
+def do_correction(input_model, rscd_model, type, group_skip=None):
     """
     Short Summary
     -------------
@@ -30,6 +30,10 @@ def do_correction(input_model, rscd_model, type):
     type: string
         type of algorithm ['baseline' or 'enhanced']
 
+    group_skip: int
+        override number of groups to skip at the beginning of an integration in
+        the baseline algorithm.  Default is None.
+
     Returns
     -------
     output_model: ~jwst.datamodels.RampModel
@@ -46,7 +50,8 @@ def do_correction(input_model, rscd_model, type):
         return input_model
 
     if type == 'baseline':
-        group_skip = param['skip']
+        if group_skip is None:
+            group_skip = param['skip']
         output = correction_skip_groups(input_model, group_skip)
     else:
         # enhanced algorithm is not enabled yet (updated code and validation needed)

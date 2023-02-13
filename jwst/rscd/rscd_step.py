@@ -20,6 +20,7 @@ class RscdStep(Step):
     # allow switching between baseline and enhanced algorithms
     spec = """
          type = option('baseline','enhanced',default = 'baseline') # Type of correction
+         group_skips = integer(default=None) # Number of groups skipped in baseline correction
        """
 
     #  TBD - only do this for the 2nd+ integrations
@@ -51,7 +52,7 @@ class RscdStep(Step):
                 rscd_model = datamodels.RSCDModel(self.rscd_name)
 
                 # Do the rscd correction
-                result = rscd_sub.do_correction(input_model, rscd_model, self.type)
+                result = rscd_sub.do_correction(input_model, rscd_model, self.type, self.group_skips)
 
                 # Close the reference file
                 rscd_model.close()
