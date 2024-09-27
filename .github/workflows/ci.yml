@@ -85,6 +85,9 @@ jobs:
           - toxenv: test-opencv-xdist
             os: ubuntu-latest
             python-version: '3.10'
+          - toxenv: test-pyargs-xdist
+            os: windows-latest
+            python-version: '3.10'
     steps:
       - uses: actions/checkout@v3
         with:
